@@ -1706,15 +1706,17 @@ function hoseCell(h,color,bgColor){
   if(!h||(!h.reading_before&&!h.reading_after)) return '<td style="text-align:center;color:var(--t3)">—</td><td style="text-align:center;color:var(--t3)">—</td>';
   const res=h.result==='pass'?`<span class="badge b-pass" style="font-size:10px;padding:2px 6px">✅ ناجح</span>`:
             h.result==='fail'?`<span class="badge b-fail" style="font-size:10px;padding:2px 6px">❌ فاشل</span>`:'';
-  const devColor=parseFloat(h.deviation)>0.5?'var(--a2)':parseFloat(h.deviation)>0.2?'var(--warn)':'var(--a3)';
+  const devColor=parseFloat(h.deviation)>0.1?'var(--a2)':parseFloat(h.deviation)>0?'var(--warn)':'var(--a3)';
   return `
-  <td style="background:${bgColor};text-align:center;padding:8px 10px">
-    <div style="font-size:14px;font-weight:800;color:var(--text)">${h.reading_before||'—'}</div>
-    ${h.deviation?`<div style="font-size:11px;font-weight:700;color:${devColor};margin-top:2px;direction:ltr">±${h.deviation}</div>`:'<div style="font-size:10px;color:var(--t3)">—</div>'}
+  <td style="background:${bgColor};text-align:center;padding:8px 10px;vertical-align:top">
+    <div style="font-size:15px;font-weight:800;color:var(--text)">${h.reading_before||'—'}</div>
+    <div style="font-size:10px;color:var(--t3);margin-top:2px">قبل</div>
   </td>
-  <td style="background:${bgColor};text-align:center;padding:8px 10px">
-    <div style="font-size:14px;font-weight:800;color:var(--text)">${h.reading_after||'—'}</div>
-    <div style="margin-top:3px">${res}</div>
+  <td style="background:${bgColor};text-align:center;padding:8px 10px;vertical-align:top">
+    <div style="font-size:15px;font-weight:800;color:var(--text)">${h.reading_after||'—'}</div>
+    <div style="font-size:10px;color:var(--t3);margin-top:2px">بعد</div>
+    ${h.deviation?`<div style="margin-top:4px;font-size:11px;font-weight:700;color:${devColor};background:${devColor}18;border-radius:6px;padding:1px 6px;direction:ltr">±${h.deviation}</div>`:''}
+    ${res?`<div style="margin-top:3px">${res}</div>`:''}
   </td>`;
 }
 
