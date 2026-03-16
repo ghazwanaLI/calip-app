@@ -1703,20 +1703,22 @@ function getFilteredPumps(){
 }
 
 function hoseCell(h,color,bgColor){
-  if(!h||(!h.reading_before&&!h.reading_after)) return '<td style="text-align:center;color:var(--t3)">—</td><td style="text-align:center;color:var(--t3)">—</td>';
+  if(!h||(!h.reading_before&&!h.reading_after))
+    return '<td style="text-align:center;color:var(--t3)">—</td><td style="text-align:center;color:var(--t3)">—</td>';
   const res=h.result==='pass'?`<span class="badge b-pass" style="font-size:10px;padding:2px 6px">✅ ناجح</span>`:
             h.result==='fail'?`<span class="badge b-fail" style="font-size:10px;padding:2px 6px">❌ فاشل</span>`:'';
-  const devColor=parseFloat(h.deviation)>0.1?'var(--a2)':parseFloat(h.deviation)>0?'var(--warn)':'var(--a3)';
+  const dev=parseFloat(h.deviation)||0;
+  const devColor=dev>0.1?'#dc2626':dev>0?'#d97706':'#16a34a';
   return `
-  <td style="background:${bgColor};text-align:center;padding:8px 10px;vertical-align:top">
-    <div style="font-size:15px;font-weight:800;color:var(--text)">${h.reading_before||'—'}</div>
-    <div style="font-size:10px;color:var(--t3);margin-top:2px">قبل</div>
+  <td style="background:${bgColor};text-align:center;padding:6px 8px">
+    <div style="font-size:15px;font-weight:800">${h.reading_before||'—'}</div>
   </td>
-  <td style="background:${bgColor};text-align:center;padding:8px 10px;vertical-align:top">
-    <div style="font-size:15px;font-weight:800;color:var(--text)">${h.reading_after||'—'}</div>
-    <div style="font-size:10px;color:var(--t3);margin-top:2px">بعد</div>
-    ${h.deviation?`<div style="margin-top:4px;font-size:11px;font-weight:700;color:${devColor};background:${devColor}18;border-radius:6px;padding:1px 6px;direction:ltr">±${h.deviation}</div>`:''}
-    ${res?`<div style="margin-top:3px">${res}</div>`:''}
+  <td style="background:${bgColor};text-align:center;padding:6px 8px">
+    <div style="font-size:15px;font-weight:800">${h.reading_after||'—'}</div>
+    <div style="margin-top:4px;display:flex;flex-direction:column;align-items:center;gap:3px">
+      ${h.deviation?`<span style="font-size:11px;font-weight:800;color:${devColor};background:${devColor}15;border-radius:6px;padding:1px 7px;direction:ltr">±${h.deviation}</span>`:''}
+      ${res}
+    </div>
   </td>`;
 }
 
@@ -1730,28 +1732,65 @@ function renderPumps(){
     const nd=du(d.next_calib);
     const statusCls=!d.next_calib?'b-na':nd<0?'b-fail':nd<=30?'b-warn':'b-pass';
     const statusLbl=!d.next_calib?'—':nd<0?'منتهي':nd<=30?nd+' يوم':fd(d.next_calib);
-    return `<tr>
-      <td style="text-align:center"><span class="snum">${(sPP-1)*PPP+i+1}</span></td>
-      <td style="font-weight:700;color:#f97316;font-size:12px">${d.pump_no||'—'}</td>
-      <td><strong>${d.name}</strong>${d.manufacturer?`<div style="font-size:10px;color:var(--t3)">${d.manufacturer}</div>`:''}</td>
-      <td><span style="background:${pr.color};color:#fff;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">${pr.label}</span></td>
-      <td style="font-size:12px;color:var(--t2)">${d.location||'—'}</td>
-      <td style="text-align:center">${d.district?`<span style="background:var(--a4d);color:var(--a4);padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(59,130,246,.3)">${d.district}</span>`:'—'}</td>
-      ${hoseCell(d.hose1,'#6366f1','rgba(99,102,241,.04)')}
-      ${hoseCell(d.hose2,'#10b981','rgba(16,185,129,.04)')}
-      <td style="font-size:12px">${fd(d.last_calib)}</td>
-      <td><span class="badge ${statusCls}" style="font-size:10px">
+    const h1=d.hose1||{};const h2=d.hose2||{};
+    const h1dev=parseFloat(h1.deviation)||0;
+    const h2dev=parseFloat(h2.deviation)||0;
+    const h1c=h1dev>0.1?'#dc2626':h1dev>0?'#d97706':'#16a34a';
+    const h2c=h2dev>0.1?'#dc2626':h2dev>0?'#d97706':'#16a34a';
+    const h1res=h1.result==='pass'?'<span class="badge b-pass" style="font-size:10px">✅ ناجح</span>':h1.result==='fail'?'<span class="badge b-fail" style="font-size:10px">❌ فاشل</span>':'';
+    const h2res=h2.result==='pass'?'<span class="badge b-pass" style="font-size:10px">✅ ناجح</span>':h2.result==='fail'?'<span class="badge b-fail" style="font-size:10px">❌ فاشل</span>':'';
+    const COLS=11; // total columns
+    return `
+    <tr style="border-bottom:none">
+      <td style="text-align:center;vertical-align:middle" rowspan="2"><span class="snum">${(sPP-1)*PPP+i+1}</span></td>
+      <td style="font-weight:700;color:#f97316;font-size:12px;vertical-align:middle" rowspan="2">${d.pump_no||'—'}</td>
+      <td style="vertical-align:middle" rowspan="2"><strong>${d.name}</strong>${d.manufacturer?`<div style="font-size:10px;color:var(--t3)">${d.manufacturer}</div>`:''}</td>
+      <td style="vertical-align:middle" rowspan="2"><span style="background:${pr.color};color:#fff;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">${pr.label}</span></td>
+      <td style="font-size:12px;color:var(--t2);vertical-align:middle" rowspan="2">${d.location||'—'}</td>
+      <td style="text-align:center;vertical-align:middle" rowspan="2">${d.district?`<span style="background:var(--a4d);color:var(--a4);padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid rgba(59,130,246,.3)">${d.district}</span>`:'—'}</td>
+      <td style="background:rgba(99,102,241,.05);text-align:center;padding:6px 10px;border-bottom:1px dashed rgba(99,102,241,.2)">
+        <div style="font-size:10px;color:#6366f1;font-weight:700;margin-bottom:2px">قبل</div>
+        <div style="font-size:15px;font-weight:800">${h1.reading_before||'—'}</div>
+      </td>
+      <td style="background:rgba(99,102,241,.05);text-align:center;padding:6px 10px;border-bottom:1px dashed rgba(99,102,241,.2)">
+        <div style="font-size:10px;color:#6366f1;font-weight:700;margin-bottom:2px">بعد</div>
+        <div style="font-size:15px;font-weight:800">${h1.reading_after||'—'}</div>
+      </td>
+      <td style="background:rgba(16,185,129,.05);text-align:center;padding:6px 10px;border-bottom:1px dashed rgba(16,185,129,.2)">
+        <div style="font-size:10px;color:#10b981;font-weight:700;margin-bottom:2px">قبل</div>
+        <div style="font-size:15px;font-weight:800">${h2.reading_before||'—'}</div>
+      </td>
+      <td style="background:rgba(16,185,129,.05);text-align:center;padding:6px 10px;border-bottom:1px dashed rgba(16,185,129,.2)">
+        <div style="font-size:10px;color:#10b981;font-weight:700;margin-bottom:2px">بعد</div>
+        <div style="font-size:15px;font-weight:800">${h2.reading_after||'—'}</div>
+      </td>
+      <td style="font-size:12px;vertical-align:middle;text-align:center" rowspan="2">${fd(d.last_calib)}</td>
+      <td style="vertical-align:middle;text-align:center" rowspan="2"><span class="badge ${statusCls}" style="font-size:10px">
         ${nd<0&&d.next_calib?'<span class="edot e-exp"></span>':nd<=30&&d.next_calib?'<span class="edot e-soon"></span>':''}
         ${statusLbl}
       </span></td>
-      <td style="text-align:center" id="wl-btn-${d.id}">
+      <td style="text-align:center;vertical-align:middle" rowspan="2">
         <button class="btn btn-o btn-sm" onclick="viewWorklog(${d.id})" title="سجل الاشتغال">📋</button>
       </td>
-      <td style="text-align:center">
-        <div style="display:flex;gap:4px;justify-content:center">
+      <td style="text-align:center;vertical-align:middle" rowspan="2">
+        <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap">
           <button class="btn btn-o btn-sm" onclick="showQRForPump(${d.id})" title="QR">📱</button>
           ${can('edit_pumps')&&canLoc(d)?`<button class="btn btn-o btn-sm" onclick="editPump(${d.id})" title="تعديل">✏️</button>`:''}
           ${can('del_pumps')&&canLoc(d)?`<button class="btn btn-r btn-sm" onclick="delPump(${d.id})" title="حذف">🗑️</button>`:''}
+        </div>
+      </td>
+    </tr>
+    <tr style="border-bottom:2px solid var(--border)">
+      <td colspan="2" style="background:rgba(99,102,241,.03);text-align:center;padding:5px 8px">
+        <div style="display:inline-flex;align-items:center;gap:8px">
+          ${h1.deviation?`<span style="font-size:12px;font-weight:800;color:${h1c};background:${h1c}15;border-radius:6px;padding:2px 8px;direction:ltr">±${h1.deviation} ل</span>`:'<span style="color:var(--t3);font-size:11px">—</span>'}
+          ${h1res}
+        </div>
+      </td>
+      <td colspan="2" style="background:rgba(16,185,129,.03);text-align:center;padding:5px 8px">
+        <div style="display:inline-flex;align-items:center;gap:8px">
+          ${h2.deviation?`<span style="font-size:12px;font-weight:800;color:${h2c};background:${h2c}15;border-radius:6px;padding:2px 8px;direction:ltr">±${h2.deviation} ل</span>`:'<span style="color:var(--t3);font-size:11px">—</span>'}
+          ${h2res}
         </div>
       </td>
     </tr>`;
