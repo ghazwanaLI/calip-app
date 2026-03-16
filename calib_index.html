@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>نظام إدارة القياس والمعايرة</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
 <style>
 :root{
   --bg:#f0f7f2;--bg2:#e8f5ed;--bg3:#dff0e5;
@@ -1954,8 +1954,12 @@ function showQROption(pump){
     by:pump.updated_by,time:new Date().toLocaleString('ar-IQ')
   });
   try{
-    new QRCode(cont,{text:qrData,width:160,height:160,colorDark:'#1a5c2e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
-  }catch(e){cont.innerHTML='<div style="font-size:11px;color:var(--a2)">خطأ في توليد QR</div>';}
+    const encoded=encodeURIComponent(qrData);
+    cont.innerHTML=`<img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encoded}&color=1a5c2e&bgcolor=ffffff&margin=4" 
+      style="width:160px;height:160px;border-radius:6px" 
+      onerror="this.parentElement.innerHTML='<div style=\"font-size:11px;color:#dc2626\">تعذر توليد QR — تحقق من الاتصال</div>'"
+      alt="QR Code">`;
+  }catch(e){cont.innerHTML='<div style="font-size:11px;color:var(--a2)">خطأ: '+e.message+'</div>';}
   document.getElementById('ov-qr').classList.add('open');
 }
 
