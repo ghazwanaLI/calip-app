@@ -490,6 +490,42 @@ tr:hover td{background:rgba(26,92,46,.04);}
           </div>
         </div>
 
+        <!-- STATIONS SECTION -->
+        <div class="section" style="margin-top:20px">
+          <div class="sec-hdr">
+            <div class="sec-actions">
+              <div class="search-box"><span class="si">🔍</span><input type="text" id="sq-station" placeholder="بحث بالاسم..." oninput="filterStations()"></div>
+              <button class="btn btn-p btn-sm" id="btn-add-station" onclick="openStationModal()" style="display:none">➕ إضافة محطة</button>
+              <button class="btn btn-o btn-sm" onclick="document.getElementById('station-excel-input').click()" id="btn-import-station" style="display:none">
+                📥 استيراد Excel
+                <input type="file" id="station-excel-input" accept=".xlsx,.xls" style="display:none" onchange="importStationsExcel(event)">
+              </button>
+              <button class="btn btn-o btn-sm" onclick="exportStationsCSV()" id="btn-export-station" style="display:none">📤 تصدير</button>
+              <button class="btn btn-o btn-sm" onclick="loadStationsLocal()">🔄</button>
+            </div>
+            <div class="sec-title">
+              <div class="sdot"></div>
+              🏭 المحطات
+              <span id="stations-count" style="background:linear-gradient(135deg,#1a5c2e,#2d8a4e);color:#fff;border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;margin-right:6px">0</span>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:40px;text-align:center">#</th>
+                  <th style="min-width:180px">اسم المحطة</th>
+                  <th style="width:110px">الموقع</th>
+                  <th style="width:100px;text-align:center">الحالة</th>
+                  <th style="width:110px;text-align:center" id="st-actions-th">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="stations-tb"></tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pg-stations"></div>
+        </div>
+
         <!-- Footer credit -->
         <div style="margin-top:40px;text-align:center;padding:28px 20px;background:linear-gradient(135deg,#1a5c2e,#0d3b1e);border-radius:var(--r);box-shadow:0 4px 20px rgba(26,92,46,.2)">
           <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:10px;font-weight:600;letter-spacing:3px">— إعداد وبرمجة —</div>
@@ -914,6 +950,30 @@ tr:hover td{background:rgba(26,92,46,.04);}
 </div>
 
 
+<!-- ══ STATION MODAL ══ -->
+<div class="overlay" id="ov-station" onclick="closeOv(event,'ov-station')">
+  <div class="modal modal-sm">
+    <div class="m-title"><span class="m-accent" id="st-ttl">🏭 إضافة محطة</span></div>
+    <input type="hidden" id="st-eid">
+    <div class="fgrid">
+      <div class="fg full"><label class="fl">اسم المحطة *</label><input class="fi" id="st-name" type="text" placeholder="اسم المحطة"></div>
+      <div class="fg"><label class="fl">الموقع</label><input class="fi" id="st-loc" type="text" placeholder="الموقع أو القسم"></div>
+      <div class="fg"><label class="fl">الحالة</label>
+        <select class="fi" id="st-status">
+          <option value="active">نشطة</option>
+          <option value="inactive">غير نشطة</option>
+        </select>
+      </div>
+      <div class="fg full"><label class="fl">ملاحظات</label>
+        <textarea class="fi" id="st-notes" rows="2" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="m-footer">
+      <button class="btn btn-o" onclick="closeModal('ov-station')">إلغاء</button>
+      <button class="btn btn-p" id="save-st-btn" onclick="saveStation()">💾 حفظ</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ QR MODAL ══ -->
 <div class="overlay" id="ov-qr" onclick="closeOv(event,'ov-qr')">
   <div class="modal modal-sm" style="text-align:center">
@@ -1050,6 +1110,10 @@ function initUI(){
   const bep=document.getElementById('btn-export-pump');if(bep)bep.style.display=can('export_pumps')?'flex':'none';
   document.getElementById('nav-users').style.display=CU.role==='admin'?'flex':'none';
   document.getElementById('nav-logs').style.display=CU.role==='admin'?'flex':'none';
+  // Stations buttons
+  ['btn-add-station','btn-import-station'].forEach(id=>{const el=document.getElementById(id);if(el)el.style.display=can('edit_devices')?'flex':'none';});
+  const bes=document.getElementById('btn-export-station');if(bes)bes.style.display=can('export_devices')?'flex':'none';
+  loadStationsLocal();
   document.getElementById('admin-sect').style.display=CU.role==='admin'?'block':'none';
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('ar-SA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 }
@@ -1904,6 +1968,136 @@ function printQR(){
   </head><body>${card}</body></html>`);
   win.document.close();
   setTimeout(()=>{win.print();},800);
+}
+
+// ── STATIONS ──
+let allStationsLocal=[],sPS=1,PPS=10;
+
+function loadStationsLocal(){
+  const saved=localStorage.getItem('calib_stations');
+  allStationsLocal=saved?JSON.parse(saved):[];
+  renderStations();
+  document.getElementById('stations-count').textContent=allStationsLocal.length;
+}
+
+function saveStationsLocal(){
+  localStorage.setItem('calib_stations',JSON.stringify(allStationsLocal));
+  document.getElementById('stations-count').textContent=allStationsLocal.length;
+}
+
+function getFilteredStations(){
+  const q=(document.getElementById('sq-station')?.value||'').trim().toLowerCase();
+  return allStationsLocal.filter(s=>!q||s.name.toLowerCase().includes(q)||( s.location&&s.location.toLowerCase().includes(q)));
+}
+function filterStations(){sPS=1;renderStations();}
+
+function renderStations(){
+  const tb=document.getElementById('stations-tb');if(!tb)return;
+  const f=getFilteredStations();
+  const pages=Math.max(1,Math.ceil(f.length/PPS));
+  if(sPS>pages)sPS=pages;
+  if(f.length===0){
+    tb.innerHTML=`<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--t3)">لا توجد محطات — استورد من Excel أو أضف يدوياً</td></tr>`;
+    document.getElementById('pg-stations').innerHTML='';return;
+  }
+  tb.innerHTML=f.slice((sPS-1)*PPS,sPS*PPS).map((s,i)=>`<tr>
+    <td style="text-align:center"><span class="snum">${(sPS-1)*PPS+i+1}</span></td>
+    <td><strong>🏭 ${s.name}</strong></td>
+    <td style="font-size:12px;color:var(--t2)">${s.location||'—'}</td>
+    <td style="text-align:center"><span class="badge ${s.status==='active'?'b-pass':'b-na'}">${s.status==='active'?'نشطة':'غير نشطة'}</span></td>
+    <td style="text-align:center">
+      <div style="display:flex;gap:4px;justify-content:center">
+        ${can('edit_devices')?`<button class="btn btn-o btn-sm" onclick="editStation(${s.id})" title="تعديل">✏️</button>`:''}
+        ${can('del_devices')?`<button class="btn btn-r btn-sm" onclick="delStation(${s.id})" title="حذف">🗑️</button>`:''}
+      </div>
+    </td>
+  </tr>`).join('');
+  renderPg('pg-stations',pages,f.length,sPS,n=>{sPS=n;renderStations();});
+}
+
+function openStationModal(){
+  document.getElementById('st-ttl').textContent='🏭 إضافة محطة';
+  document.getElementById('st-eid').value='';
+  ['st-name','st-loc','st-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('st-status').value='active';
+  document.getElementById('ov-station').classList.add('open');
+}
+function editStation(id){
+  const s=allStationsLocal.find(x=>x.id===id);if(!s)return;
+  document.getElementById('st-ttl').textContent='✏️ تعديل محطة';
+  document.getElementById('st-eid').value=id;
+  document.getElementById('st-name').value=s.name||'';
+  document.getElementById('st-loc').value=s.location||'';
+  document.getElementById('st-notes').value=s.notes||'';
+  document.getElementById('st-status').value=s.status||'active';
+  document.getElementById('ov-station').classList.add('open');
+}
+function saveStation(){
+  const name=document.getElementById('st-name').value.trim();
+  if(!name){toast('اسم المحطة مطلوب','err');return;}
+  const eid=parseInt(document.getElementById('st-eid').value);
+  const station={
+    id:eid||Date.now(),
+    name,
+    location:document.getElementById('st-loc').value.trim(),
+    notes:document.getElementById('st-notes').value.trim(),
+    status:document.getElementById('st-status').value,
+    added_by:CU?.fullname||'',
+    added_at:new Date().toLocaleDateString('ar-IQ'),
+  };
+  if(eid){
+    const idx=allStationsLocal.findIndex(x=>x.id===eid);
+    if(idx!==-1)allStationsLocal[idx]={...allStationsLocal[idx],...station};
+  }else{
+    allStationsLocal.push(station);
+  }
+  saveStationsLocal();renderStations();
+  toast('تم الحفظ ✅');closeModal('ov-station');
+}
+function delStation(id){
+  if(!confirm('حذف هذه المحطة؟'))return;
+  allStationsLocal=allStationsLocal.filter(x=>x.id!==id);
+  saveStationsLocal();renderStations();toast('تم الحذف');
+}
+
+async function importStationsExcel(e){
+  const file=e.target.files[0];if(!file)return;
+  try{
+    const {read,utils}=await import('https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs');
+    const buf=await file.arrayBuffer();
+    const wb=read(buf);
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=utils.sheet_to_json(ws,{header:1});
+    let added=0,skipped=0;
+    const existing=new Set(allStationsLocal.map(s=>s.name.trim()));
+    rows.slice(1).forEach(row=>{
+      const name=(row[0]||'').toString().trim();
+      if(!name){skipped++;return;}
+      if(existing.has(name)){skipped++;return;}
+      allStationsLocal.push({
+        id:Date.now()+Math.random(),
+        name,
+        location:(row[1]||'').toString().trim(),
+        status:'active',
+        added_by:CU?.fullname||'',
+        added_at:new Date().toLocaleDateString('ar-IQ'),
+      });
+      existing.add(name);added++;
+    });
+    saveStationsLocal();renderStations();
+    toast(`✅ تم استيراد ${added} محطة — تخطي ${skipped}`);
+  }catch(err){
+    toast('خطأ في قراءة الملف: '+err.message,'err');
+  }
+  e.target.value='';
+}
+
+function exportStationsCSV(){
+  const rows=[['اسم المحطة','الموقع','الحالة','أضيفت بواسطة','تاريخ الإضافة']];
+  allStationsLocal.forEach(s=>rows.push([s.name,s.location,s.status==='active'?'نشطة':'غير نشطة',s.added_by,s.added_at]));
+  const csv=rows.map(r=>r.map(c=>`"${(c||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download='المحطات.csv';a.click();toast('تم التصدير ✅');
 }
 
 // ── INIT ──
