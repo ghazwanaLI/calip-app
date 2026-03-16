@@ -874,7 +874,12 @@ tr:hover td{background:rgba(26,92,46,.04);}
         </select>
       </div>
       <div class="fg"><label class="fl">الشركة الصانعة / المورد</label><input class="fi" id="p-mfr" type="text"></div>
-      <div class="fg"><label class="fl">الموقع</label><input class="fi" id="p-loc" type="text"></div>
+      <div class="fg"><label class="fl">اسم المحطة</label>
+        <div style="position:relative">
+          <input class="fi" id="p-loc" type="text" placeholder="اكتب أول حرفين..." autocomplete="off" oninput="filterStationSuggest(this.value)" onblur="setTimeout(()=>hideStationSuggest(),200)">
+          <div id="station-suggest" style="display:none;position:absolute;top:100%;right:0;left:0;background:#fff;border:1.5px solid var(--border);border-radius:10px;z-index:500;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(26,92,46,.15);margin-top:3px"></div>
+        </div>
+      </div>
       <div class="fg"><label class="fl">اسم القاطع</label>
         <select class="fi" id="p-district">
           <option value="">— اختر القاطع —</option>
@@ -1970,24 +1975,44 @@ function printQR(){
   setTimeout(()=>{win.print();},800);
 }
 
+function filterStationSuggest(val){
+  const sug=document.getElementById('station-suggest');
+  if(!val||val.length<2){sug.style.display='none';return;}
+  const q=val.trim().toLowerCase();
+  const matches=allStationsLocal.filter(s=>s.name.toLowerCase().includes(q)).slice(0,8);
+  if(matches.length===0){sug.style.display='none';return;}
+  sug.innerHTML=matches.map(s=>`
+    <div onclick="selectStation('${s.name.replace(/'/g,"\\'")}');hideStationSuggest()"
+      style="padding:10px 14px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text);border-bottom:1px solid var(--border);transition:background .15s"
+      onmouseover="this.style.background='rgba(26,92,46,.07)'" onmouseout="this.style.background='transparent'">
+      🏭 ${s.name}${s.location?`<span style="font-size:11px;color:var(--t3);font-weight:400;margin-right:6px">— ${s.location}</span>`:''}
+    </div>`).join('');
+  sug.style.display='block';
+}
+function selectStation(name){
+  document.getElementById('p-loc').value=name;
+  hideStationSuggest();
+}
+function hideStationSuggest(){
+  const sug=document.getElementById('station-suggest');
+  if(sug)sug.style.display='none';
+}
+
 // ── STATIONS ──
 let allStationsLocal=[],sPS=1,PPS=10;
 
-function loadStationsLocal(){
-  const saved=localStorage.getItem('calib_stations');
-  allStationsLocal=saved?JSON.parse(saved):[];
+async function loadStationsLocal(){
+  try{
+    const d=await api('GET','/api/stations-local');
+    allStationsLocal=d.stations||[];
+  }catch(e){allStationsLocal=[];}
   renderStations();
-  document.getElementById('stations-count').textContent=allStationsLocal.length;
-}
-
-function saveStationsLocal(){
-  localStorage.setItem('calib_stations',JSON.stringify(allStationsLocal));
   document.getElementById('stations-count').textContent=allStationsLocal.length;
 }
 
 function getFilteredStations(){
   const q=(document.getElementById('sq-station')?.value||'').trim().toLowerCase();
-  return allStationsLocal.filter(s=>!q||s.name.toLowerCase().includes(q)||( s.location&&s.location.toLowerCase().includes(q)));
+  return allStationsLocal.filter(s=>!q||s.name.toLowerCase().includes(q)||(s.location&&s.location.toLowerCase().includes(q)));
 }
 function filterStations(){sPS=1;renderStations();}
 
@@ -2002,13 +2027,13 @@ function renderStations(){
   }
   tb.innerHTML=f.slice((sPS-1)*PPS,sPS*PPS).map((s,i)=>`<tr>
     <td style="text-align:center"><span class="snum">${(sPS-1)*PPS+i+1}</span></td>
-    <td><strong>🏭 ${s.name}</strong></td>
+    <td><strong>🏭 ${s.name}</strong>${s.notes?`<div style="font-size:10px;color:var(--t3)">${s.notes}</div>`:''}</td>
     <td style="font-size:12px;color:var(--t2)">${s.location||'—'}</td>
-    <td style="text-align:center"><span class="badge ${s.status==='active'?'b-pass':'b-na'}">${s.status==='active'?'نشطة':'غير نشطة'}</span></td>
+    <td style="text-align:center"><span class="badge ${s.status==='active'?'b-pass':'b-na'}">${s.status==='active'?'✅ نشطة':'⛔ غير نشطة'}</span></td>
     <td style="text-align:center">
       <div style="display:flex;gap:4px;justify-content:center">
-        ${can('edit_devices')?`<button class="btn btn-o btn-sm" onclick="editStation(${s.id})" title="تعديل">✏️</button>`:''}
-        ${can('del_devices')?`<button class="btn btn-r btn-sm" onclick="delStation(${s.id})" title="حذف">🗑️</button>`:''}
+        ${can('edit_devices')||can('edit')?`<button class="btn btn-o btn-sm" onclick="editStation(${s.id})" title="تعديل">✏️</button>`:''}
+        ${can('del_devices')||can('del')?`<button class="btn btn-r btn-sm" onclick="delStation(${s.id})" title="حذف">🗑️</button>`:''}
       </div>
     </td>
   </tr>`).join('');
@@ -2032,70 +2057,45 @@ function editStation(id){
   document.getElementById('st-status').value=s.status||'active';
   document.getElementById('ov-station').classList.add('open');
 }
-function saveStation(){
+async function saveStation(){
   const name=document.getElementById('st-name').value.trim();
   if(!name){toast('اسم المحطة مطلوب','err');return;}
   const eid=parseInt(document.getElementById('st-eid').value);
-  const station={
-    id:eid||Date.now(),
-    name,
-    location:document.getElementById('st-loc').value.trim(),
-    notes:document.getElementById('st-notes').value.trim(),
-    status:document.getElementById('st-status').value,
-    added_by:CU?.fullname||'',
-    added_at:new Date().toLocaleDateString('ar-IQ'),
-  };
-  if(eid){
-    const idx=allStationsLocal.findIndex(x=>x.id===eid);
-    if(idx!==-1)allStationsLocal[idx]={...allStationsLocal[idx],...station};
-  }else{
-    allStationsLocal.push(station);
-  }
-  saveStationsLocal();renderStations();
-  toast('تم الحفظ ✅');closeModal('ov-station');
+  const body={name,location:document.getElementById('st-loc').value.trim(),notes:document.getElementById('st-notes').value.trim(),status:document.getElementById('st-status').value};
+  const btn=document.getElementById('save-st-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
+  try{
+    if(eid) await api('PUT',`/api/stations-local/${eid}`,body);
+    else await api('POST','/api/stations-local',body);
+    toast('تم الحفظ ✅');closeModal('ov-station');await loadStationsLocal();
+  }catch(e){toast('خطأ: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='💾 حفظ';}
 }
-function delStation(id){
+async function delStation(id){
   if(!confirm('حذف هذه المحطة؟'))return;
-  allStationsLocal=allStationsLocal.filter(x=>x.id!==id);
-  saveStationsLocal();renderStations();toast('تم الحذف');
+  try{await api('DELETE',`/api/stations-local/${id}`);toast('تم الحذف');await loadStationsLocal();}
+  catch(e){toast('خطأ: '+e.message,'err');}
 }
 
 async function importStationsExcel(e){
   const file=e.target.files[0];if(!file)return;
-  try{
-    const {read,utils}=await import('https://cdn.sheetjs.com/xlsx-latest/package/xlsx.mjs');
-    const buf=await file.arrayBuffer();
-    const wb=read(buf);
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=utils.sheet_to_json(ws,{header:1});
-    let added=0,skipped=0;
-    const existing=new Set(allStationsLocal.map(s=>s.name.trim()));
-    rows.slice(1).forEach(row=>{
-      const name=(row[0]||'').toString().trim();
-      if(!name){skipped++;return;}
-      if(existing.has(name)){skipped++;return;}
-      allStationsLocal.push({
-        id:Date.now()+Math.random(),
-        name,
-        location:(row[1]||'').toString().trim(),
-        status:'active',
-        added_by:CU?.fullname||'',
-        added_at:new Date().toLocaleDateString('ar-IQ'),
-      });
-      existing.add(name);added++;
-    });
-    saveStationsLocal();renderStations();
-    toast(`✅ تم استيراد ${added} محطة — تخطي ${skipped}`);
-  }catch(err){
-    toast('خطأ في قراءة الملف: '+err.message,'err');
-  }
+  const r=new FileReader();
+  r.onload=async ev=>{
+    const b64=ev.target.result.split(',')[1];
+    try{
+      const d=await api('POST','/api/import-stations',{data:b64});
+      toast(`✅ تم استيراد ${d.added} محطة — تخطي ${d.skipped}`);
+      await loadStationsLocal();
+    }catch(err){toast('خطأ: '+err.message,'err');}
+  };
+  r.readAsDataURL(file);
   e.target.value='';
 }
 
 function exportStationsCSV(){
   const rows=[['اسم المحطة','الموقع','الحالة','أضيفت بواسطة','تاريخ الإضافة']];
   allStationsLocal.forEach(s=>rows.push([s.name,s.location,s.status==='active'?'نشطة':'غير نشطة',s.added_by,s.added_at]));
-  const csv=rows.map(r=>r.map(c=>`"${(c||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const csv=rows.map(r=>r.map(x=>`"${(x||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download='المحطات.csv';a.click();toast('تم التصدير ✅');
 }
