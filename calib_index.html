@@ -2001,13 +2001,14 @@ function hideStationSuggest(){
 // ── STATIONS ──
 let allStationsLocal=[],sPS=1,PPS=10;
 
-async function loadStationsLocal(){
+function loadStationsLocal(){
   try{
-    const d=await api('GET','/api/stations-local');
-    allStationsLocal=d.stations||[];
+    const saved=localStorage.getItem('calib_stations');
+    allStationsLocal=saved?JSON.parse(saved):[];
   }catch(e){allStationsLocal=[];}
   renderStations();
-  document.getElementById('stations-count').textContent=allStationsLocal.length;
+  const el=document.getElementById('stations-count');
+  if(el)el.textContent=allStationsLocal.length;
 }
 
 function getFilteredStations(){
@@ -2065,15 +2066,20 @@ async function saveStation(){
   const btn=document.getElementById('save-st-btn');
   btn.disabled=true;btn.innerHTML='<span class="spinner"></span>';
   try{
-    if(eid) await api('PUT',`/api/stations-local/${eid}`,body);
-    else await api('POST','/api/stations-local',body);
-    toast('تم الحفظ ✅');closeModal('ov-station');await loadStationsLocal();
+    if(eid){
+      const idx=allStationsLocal.findIndex(x=>x.id===eid);
+      if(idx!==-1) allStationsLocal[idx]={...allStationsLocal[idx],...body};
+    }else{
+      allStationsLocal.push(body);
+    }
+    localStorage.setItem('calib_stations',JSON.stringify(allStationsLocal));
+    toast('تم الحفظ ✅');closeModal('ov-station');loadStationsLocal();
   }catch(e){toast('خطأ: '+e.message,'err');}
   finally{btn.disabled=false;btn.textContent='💾 حفظ';}
 }
 async function delStation(id){
   if(!confirm('حذف هذه المحطة؟'))return;
-  try{await api('DELETE',`/api/stations-local/${id}`);toast('تم الحذف');await loadStationsLocal();}
+  try{allStationsLocal=allStationsLocal.filter(x=>x.id!==id);localStorage.setItem('calib_stations',JSON.stringify(allStationsLocal));toast('تم الحذف');loadStationsLocal();}
   catch(e){toast('خطأ: '+e.message,'err');}
 }
 
