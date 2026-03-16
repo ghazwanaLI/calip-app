@@ -299,16 +299,74 @@ tr:hover td{background:rgba(26,92,46,.04);}
 .wcard-ico{width:46px;height:46px;border-radius:12px;display:flex;align-items:center;
   justify-content:center;font-size:22px;flex-shrink:0;}
 .wcard-num{font-size:28px;font-weight:800;}
-.wcard-lbl{font-size:12px;color:var(--t3);margin-top:2px;}
+.hamburger{display:none;width:38px;height:38px;border-radius:10px;border:1.5px solid var(--border);
+  background:transparent;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:5px;}
+.hamburger span{width:18px;height:2px;background:var(--text);border-radius:2px;transition:all .2s;}
+
 
 /* ── RESPONSIVE ── */
 @media(max-width:768px){
   :root{--sw:0px;}
-  .sidebar{transform:translateX(100%);transition:transform .3s;}
+
+  /* Sidebar */
+  .sidebar{transform:translateX(110%);transition:transform .3s;z-index:200;width:280px;}
   .sidebar.open{transform:translateX(0);}
-  .stats-grid,.welcome-grid{grid-template-columns:1fr 1fr;}
-  .content{padding:16px;}
+  .sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:199;}
+  .sb-overlay.open{display:block;}
+
+  /* Main */
+  .main{margin-right:0;}
+  .content{padding:12px;}
+
+  /* Header */
+  .header{padding:10px 14px;}
+  .h-title{font-size:13px;}
+  #hdate{display:none;}
+
+  /* Hamburger button */
+  .hamburger{display:flex!important;}
+
+  /* Stats */
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .sc{padding:14px;}
+  .sc-val{font-size:28px!important;}
+  .sc-lbl{font-size:11px;}
+  .welcome-grid{grid-template-columns:1fr 1fr;}
+
+  /* Forms */
   .fgrid{grid-template-columns:1fr;}
+  .modal{padding:18px;border-radius:16px;max-height:95vh;}
+  .type-grid{grid-template-columns:repeat(3,1fr);}
+
+  /* Tables */
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{min-width:700px;font-size:11.5px;}
+  th,td{padding:8px 10px;}
+
+  /* Pagination */
+  .pagination{padding:10px 14px;}
+
+  /* Login */
+  .lbox{padding:32px 22px;border-radius:18px;}
+  .licon{width:56px;height:56px;font-size:24px;}
+
+  /* Alerts */
+  .alert-bar{padding:10px 12px;}
+  .alert-chips{gap:5px;}
+  .achip{font-size:11px;padding:2px 8px;}
+
+  /* Section header */
+  .sec-hdr{padding:12px 14px;gap:8px;}
+  .sec-actions{flex-wrap:wrap;gap:6px;}
+  .search-box input{width:140px;}
+  .search-box input:focus{width:160px;}
+}
+
+@media(max-width:420px){
+  .stats-grid{grid-template-columns:1fr 1fr;}
+  .welcome-grid{grid-template-columns:1fr;}
+  .sc-val{font-size:24px!important;}
+  .type-grid{grid-template-columns:repeat(2,1fr);}
 }
 </style>
 </head>
@@ -316,6 +374,7 @@ tr:hover td{background:rgba(26,92,46,.04);}
 
 <!-- ── TOAST ── -->
 <div class="toast" id="toast"></div>
+<div class="sb-overlay" id="sb-overlay" onclick="toggleSidebar()"></div>
 
 <!-- ── LOGIN ── -->
 <div id="login-screen">
@@ -377,6 +436,9 @@ tr:hover td{background:rgba(26,92,46,.04);}
         <span class="odot" title="متصل"></span>
         <div style="font-size:12px;color:var(--t3)" id="hdate"></div>
         <button class="btn btn-p btn-sm" id="btn-add" onclick="openDeviceModal()" style="display:none">➕ إضافة جهاز</button>
+        <button class="hamburger" id="hamburger" onclick="toggleSidebar()">
+          <span></span><span></span><span></span>
+        </button>
       </div>
     </div>
 
@@ -926,6 +988,19 @@ function initUI(){
   document.getElementById('hdate').textContent=new Date().toLocaleDateString('ar-SA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 }
 
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar');
+  const ov=document.getElementById('sb-overlay');
+  sb.classList.toggle('open');
+  ov.classList.toggle('open');
+}
+function closeSidebarOnNav(){
+  if(window.innerWidth<=768){
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sb-overlay').classList.remove('open');
+  }
+}
+
 // ── TABS ──
 function goTab(name,el){
   ['dashboard','devices','users','logs','pumps'].forEach(t=>{
@@ -934,6 +1009,7 @@ function goTab(name,el){
   });
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
+  closeSidebarOnNav();
   if(name==='devices') renderDevices();
   if(name==='pumps'){loadPumps();}
   if(name==='users') loadUsers();
