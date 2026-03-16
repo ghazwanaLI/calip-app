@@ -1217,6 +1217,12 @@ let CU=null,allDevices=[],TYPES={},UF={},sP=1,PP=10;
 async function api(method,path,body=null){
   try{
     const r=await fetch(API+path,{method,headers:{'Content-Type':'application/json','Authorization':'Bearer '+TOKEN},body:body?JSON.stringify(body):null});
+    if(r.status===401&&path!=='/api/login'){
+      TOKEN='';localStorage.removeItem('calib_token');
+      document.getElementById('login-screen').style.display='flex';
+      document.getElementById('app').style.display='none';
+      throw new Error('انتهت الجلسة — يرجى تسجيل الدخول مجدداً');
+    }
     const d=await r.json();
     if(!r.ok) throw new Error(d.error||`خطأ ${r.status}`);
     return d;
@@ -1254,13 +1260,20 @@ async function doLogout(){
   document.getElementById('app').style.display='none';
 }
 async function tryAutoLogin(){
-  if(!TOKEN)return;
+  if(!TOKEN){
+    document.getElementById('login-screen').style.display='flex';
+    return;
+  }
   try{
     const d=await api('GET','/api/me');CU=d.user;
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
     initUI();await loadTypes();await loadDevices();
-  }catch(e){TOKEN='';localStorage.removeItem('calib_token');}
+  }catch(e){
+    TOKEN='';localStorage.removeItem('calib_token');
+    document.getElementById('login-screen').style.display='flex';
+    document.getElementById('app').style.display='none';
+  }
 }
 
 function can(p){if(!CU)return false;if(CU.role==='admin')return true;return!!CU.perms?.[p];}
